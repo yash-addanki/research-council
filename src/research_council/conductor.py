@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from typing import Callable
 
-from research_council.steps import brief, chairman, citations, council, review, scout
+from research_council.steps import act, brief, chairman, citations, council, review, scout
 from research_council.steps.context import RunContext
 from research_council.tokens import token_table, total_tokens
 
@@ -57,7 +57,7 @@ def report_step(ctx: RunContext) -> Path:
 
 DEFAULT_STEPS: dict[str, Callable[[RunContext], Path]] = {
     "brief": brief.run, "scout": scout.run, "deep_submit": _skipped("deep_submit"), "council": council.run,
-    "citations": citations.run, "review": review.run, "chairman": chairman.run, "act": _skipped("act"),
+    "citations": citations.run, "review": review.run, "chairman": chairman.run, "act": act.run,
     "report": report_step,
 }
 
