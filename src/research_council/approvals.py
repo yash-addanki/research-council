@@ -70,11 +70,16 @@ class WhatsApp:
                 log.warning("relay poll failed: %s", exc)
                 continue
             for row in rows:
-                if row.get("approval_id") == aid and row.get("answer") in ("yes", "no"):
+                if row.get("approval_id") == aid and row.get("answer") in ("yes", "no") \
+                        and _digits(row.get("from_number")) == _digits(self.to):  # only Yash's own reply counts
                     return row["answer"]
         if not sent:
             self.sleep(min(timeout_s, poll_s))
         return "timeout"
+
+
+def _digits(number) -> str:
+    return "".join(ch for ch in str(number or "") if ch.isdigit())
 
 
 def notifier_from_keychain() -> WhatsApp:

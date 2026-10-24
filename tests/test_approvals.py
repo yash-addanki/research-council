@@ -33,7 +33,7 @@ def wa(graph, clock):
 
 
 def test_ask_sends_buttons_and_returns_yes_on_matching_reply():
-    g = Graph(replies={"abc123": [{"approval_id": "abc123", "answer": "yes"}]})
+    g = Graph(replies={"abc123": [{"approval_id": "abc123", "answer": "yes", "from_number": "15550001"}]})
     assert wa(g, [0.0]).ask("Start research: X?") == "yes"
     msg = g.sent[0]
     assert msg["type"] == "interactive" and msg["to"] == "15550001"
@@ -54,7 +54,7 @@ def test_ask_timeout_is_no_reply():
 
 
 def test_ask_falls_back_to_template_outside_24h_window():
-    g = Graph(replies={"abc123": [{"approval_id": "abc123", "answer": "no"}]}, send_error=131047)
+    g = Graph(replies={"abc123": [{"approval_id": "abc123", "answer": "no", "from_number": "15550001"}]}, send_error=131047)
     assert wa(g, [0.0]).ask("q") == "no"
     tmpl = g.sent[1]
     assert tmpl["type"] == "template" and tmpl["template"]["name"] == "research_approval"
@@ -71,3 +71,8 @@ def test_notify_sends_text():
 def test_send_failure_counts_as_no_reply():
     g = Graph(send_status=500)
     assert wa(g, [0.0]).ask("q", timeout_s=40) == "timeout"
+
+
+def test_ask_ignores_reply_from_another_number():
+    g = Graph(replies={"abc123": [{"approval_id": "abc123", "answer": "yes", "from_number": "19998887777"}]})
+    assert wa(g, [0.0]).ask("q", timeout_s=100, poll_s=20) == "timeout"
