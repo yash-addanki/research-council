@@ -59,3 +59,11 @@ def test_calls_since_counts_recent_calls(state):
     state.record_usage("r1", "a", "claude", 1, 1, now=1000)
     state.record_usage("r1", "b", "claude", 1, 1, now=2000)
     assert state.calls_since("claude", since=1500) == 1
+
+
+def test_record_usage_is_thread_safe(state):
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(8) as pool:
+        list(pool.map(lambda i: state.record_usage("r", "s", "m", i, i, now=i), range(400)))
+    assert len(state.usage_for_run("r")) == 400
