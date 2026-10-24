@@ -1,0 +1,29 @@
+notion_data_source_id = "584e4526-ff39-4614-96d7-f1c0e2b051dd"
+allowlist = ["Panniantong/Agent-Reach", "mvanhorn/last30days-skill", "unclecode/crawl4ai", "multica-ai/andrej-karpathy-skills"]
+
+[paths]
+runs_dir = "~/GitRepos/research-council/runs"
+gitrepos = "~/GitRepos"
+db = "~/GitRepos/research-council/state.db"
+
+# Model names per tier; confirmed in docs/cli-notes.md
+[tiers.claude]
+cheap = "haiku"
+mid = "sonnet"
+top = "opus"
+
+[tiers.codex]
+cheap = "gpt-5-mini"
+mid = "gpt-5"
+top = "gpt-5"
+
+[tiers.gemini]
+cheap = "gemini-2.5-flash"
+mid = "gemini-2.5-pro"
+top = "gemini-2.5-pro"
+
+[caps]
+evidence_low = 30
+evidence_medium = 45
+evidence_high = 60
+calls_per_model_per_run = 12
