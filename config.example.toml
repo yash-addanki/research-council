@@ -27,3 +27,6 @@ evidence_low = 30
 evidence_medium = 45
 evidence_high = 60
 calls_per_model_per_run = 12
+
+# rolling 5-hour cap the scheduler respects per model
+calls_per_model_per_window = 60
