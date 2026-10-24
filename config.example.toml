@@ -13,9 +13,9 @@ mid = "sonnet"
 top = "opus"
 
 [tiers.codex]
-cheap = "gpt-5-mini"
-mid = "gpt-5"
-top = "gpt-5"
+cheap = "gpt-6-luna"
+mid = "gpt-6.1-sol"
+top = "gpt-6-astra"
 
 [tiers.gemini]
 cheap = "gemini-2.5-flash"

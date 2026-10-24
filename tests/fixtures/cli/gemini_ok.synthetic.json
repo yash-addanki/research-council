@@ -1,0 +1,1 @@
+{"session_id":"synthetic","response":"OK","stats":{"models":{"gemini-2.5-flash":{"api":{"totalRequests":1,"totalErrors":0},"tokens":{"input":812,"prompt":812,"candidates":2,"total":830,"cached":0,"thoughts":16,"tool":0}}},"tools":{"totalCalls":0,"byName":{}}}}
