@@ -1,0 +1,8 @@
+claude_ok.json                      0
+claude_web.json                     0
+claude_usage_cmd.json               0
+codex_ok.jsonl                      0
+codex_web.jsonl                     0
+codex_model_error.jsonl             1   (-m gpt-5.4-mini rejected for ChatGPT account)
+codex_web_toplevel_search_401.jsonl 1   (codex --search exec ... -> 401 against api.openai.com)
+gemini_auth_error.json              41  (stderr; stdout empty; no auth configured)
