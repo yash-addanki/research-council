@@ -25,6 +25,8 @@ class RunContext:
     cfg: Config
     dry_run: bool = False
     clock: Callable[[], float] = time.time
+    notion: object = None  # NotionClient, set by the pipeline
+    notifier: object = None  # has notify(text); set by the pipeline
     _calls: dict[str, int] = field(default_factory=dict)
 
     def call(self, runner_name: str, prompt: str, tier: str, step: str, web: bool = False,
