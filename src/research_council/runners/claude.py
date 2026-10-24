@@ -21,7 +21,7 @@ class ClaudeRunner(CliRunner):
         if web:
             argv += ["--allowedTools", WEB_TOOLS]
         if self.chrome:
-            argv.append("--chrome")
+            argv += ["--chrome", "--allowedTools", "mcp__claude-in-chrome__*"]
         return argv
 
     def parse(self, stdout: str, stderr: str, returncode: int) -> RunResult:

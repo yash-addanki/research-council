@@ -122,3 +122,20 @@ def test_lease_lost_stops_run(tmp_path):
     with pytest.raises(conductor.LeaseLost):
         pipe.run()
     assert calls == []
+
+
+def test_heartbeat_keeps_lease_alive_during_long_step(tmp_path, monkeypatch):
+    import time
+    monkeypatch.setattr(conductor, "HEARTBEAT_S", 0.01)
+    calls, beats = [], []
+    slow = writer("brief", calls)
+    ctx, _, _, pipe = make(tmp_path, all_steps(calls, brief=lambda c: (time.sleep(0.15), slow(c))[-1]))
+    real = ctx.state.heartbeat
+    monkeypatch.setattr(ctx.state, "heartbeat", lambda *a, **k: (beats.append(1), real(*a, **k))[-1])
+    pipe.run()
+    assert len(beats) > len(conductor.STEPS) + 3
+
+
+def test_deep_submit_uses_chrome_step():
+    from research_council.runners import chrome_deep
+    assert conductor.DEFAULT_STEPS["deep_submit"] is chrome_deep.submit

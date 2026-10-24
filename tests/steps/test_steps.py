@@ -199,3 +199,23 @@ def test_chairman_writes_ranked_repos(make_ctx):
     repos = ctx.read_json("repos.json")
     assert repos[0]["full_name"].lower() == "a/b" and abs(repos[0]["relevance"] - 0.8) < 1e-9
     assert repos[0]["votes"] == 2
+
+
+def test_council_collects_deep_reports_alongside_members(make_ctx, monkeypatch):
+    ctx = make_ctx({"claude": FakeRunner("claude", [ok(answer([]))])})
+    ctx.write_json("brief.json", BRIEF)
+    ctx.path("evidence.jsonl").write_text("")
+    monkeypatch.setattr(council.chrome_deep, "collect",
+                        lambda c: [c.path("deep.muse.md").write_text("Muse report") and c.path("deep.muse.md")])
+    council.run(ctx)
+    answers = council.load_answers(ctx)
+    assert answers["muse"]["conclusion"] == "Muse report" and "claude" in answers
+
+
+def test_council_survives_deep_collect_crash(make_ctx, monkeypatch):
+    ctx = make_ctx({"claude": FakeRunner("claude", [ok(answer([]))])})
+    ctx.write_json("brief.json", BRIEF)
+    ctx.path("evidence.jsonl").write_text("")
+    monkeypatch.setattr(council.chrome_deep, "collect", lambda c: 1 / 0)
+    council.run(ctx)
+    assert "deep_research" in ctx.read_json("missing.json")

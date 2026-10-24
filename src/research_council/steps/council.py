@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from research_council.prompts import render
+from research_council.runners import chrome_deep
 from research_council.steps.context import RunContext
 from research_council.steps.util import evidence_text, parse_json
 
@@ -37,11 +38,16 @@ def run(ctx: RunContext) -> Path:
             return name, None, res.error or "reply was not valid JSON"
         return name, data, None
 
-    with ThreadPoolExecutor(len(MEMBERS)) as pool:
+    with ThreadPoolExecutor(len(MEMBERS) + 1) as pool:
+        deep = pool.submit(chrome_deep.collect, ctx)  # waits on app Deep Research tabs while members answer
         for name, data, err in pool.map(ask, MEMBERS):
             if data is None:
                 missing[name] = err
             else:
                 data.setdefault("repos", [])
                 ctx.write_json(f"answer.{name}.json", data)
+        try:
+            deep.result()
+        except Exception as exc:  # a Chrome problem never sinks the CLI members' answers
+            missing["deep_research"] = str(exc)
     return ctx.write_json("missing.json", missing)

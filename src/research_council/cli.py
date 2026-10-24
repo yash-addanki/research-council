@@ -35,7 +35,7 @@ def page_id_from(value: str) -> str:
 
 def make_runners(cfg: Config) -> dict:
     return {"claude": ClaudeRunner(cfg.tiers["claude"]), "codex": CodexRunner(cfg.tiers["codex"]),
-            "gemini": GeminiRunner(cfg.tiers["gemini"])}
+            "gemini": GeminiRunner(cfg.tiers["gemini"]), "chrome": ClaudeRunner(cfg.tiers["claude"], chrome=True)}
 
 
 def start_run(cfg: Config, notion, topic: Topic, dry_run: bool, notifier, run_id: str | None = None) -> int:

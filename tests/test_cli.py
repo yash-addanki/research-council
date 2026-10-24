@@ -33,3 +33,10 @@ def test_cli_next_with_empty_queue(tmp_path, capsys):
     cfg.paths.runs_dir, cfg.paths.db = tmp_path / "runs", tmp_path / "s.db"
     assert cli.cmd_next(cfg, FakeNotion([]), dry_run=True, notifier=None) == 0
     assert "No topics" in capsys.readouterr().out
+
+
+def test_make_runners_includes_chrome_runner():
+    from research_council.config import load_config
+    from .steps.conftest import EXAMPLE
+    runners = cli.make_runners(load_config(EXAMPLE))
+    assert set(runners) == {"claude", "codex", "gemini", "chrome"} and runners["chrome"].chrome

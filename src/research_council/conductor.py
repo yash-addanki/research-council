@@ -2,14 +2,17 @@
 
 import json
 import logging
+import threading
 from pathlib import Path
 from typing import Callable
 
+from research_council.runners import chrome_deep
 from research_council.steps import act, brief, chairman, citations, council, review, scout
 from research_council.steps.context import RunContext
 from research_council.tokens import token_table, total_tokens
 
 log = logging.getLogger(__name__)
+HEARTBEAT_S = 300  # steps (council + Deep Research wait) can outlast the 30 min lease
 
 STEPS = ["brief", "scout", "deep_submit", "council", "citations", "review", "chairman", "act", "report"]
 OUTPUTS = {
@@ -26,12 +29,6 @@ class Blocked(RuntimeError):
 
 class LeaseLost(RuntimeError):
     pass
-
-
-def _skipped(name: str) -> Callable[[RunContext], Path]:
-    def step(ctx: RunContext) -> Path:
-        return ctx.write_json(OUTPUTS[name], {"skipped": True, "reason": "not enabled yet"})
-    return step
 
 
 def report_step(ctx: RunContext) -> Path:
@@ -56,7 +53,7 @@ def report_step(ctx: RunContext) -> Path:
 
 
 DEFAULT_STEPS: dict[str, Callable[[RunContext], Path]] = {
-    "brief": brief.run, "scout": scout.run, "deep_submit": _skipped("deep_submit"), "council": council.run,
+    "brief": brief.run, "scout": scout.run, "deep_submit": chrome_deep.submit, "council": council.run,
     "citations": citations.run, "review": review.run, "chairman": chairman.run, "act": act.run,
     "report": report_step,
 }
@@ -80,6 +77,10 @@ class Pipeline:
                 self.notifier.notify(f"Research Blocked: {self.ctx.topic.title}\n{msg}")
         raise Blocked(msg)
 
+    def _beat(self, done: threading.Event):
+        while not done.wait(HEARTBEAT_S):
+            self.ctx.state.heartbeat(self.ctx.topic.page_id, self.lease_version, self.ctx.clock())
+
     def run(self) -> Path:
         ctx = self.ctx
         for name in STEPS:
@@ -89,6 +90,9 @@ class Pipeline:
             if out.exists():
                 continue
             last_error = None
+            done = threading.Event()
+            beat = threading.Thread(target=self._beat, args=(done,), daemon=True)
+            beat.start()
             for _ in range(ATTEMPTS):
                 try:
                     self.steps[name](ctx)
@@ -97,6 +101,8 @@ class Pipeline:
                 except Exception as exc:  # any step failure gets one retry, then Blocked
                     last_error = exc
                     log.warning("step %s failed: %s", name, exc)
+            done.set()
+            beat.join()
             if last_error is not None:
                 self._block(name, str(last_error))
             if name == "council" and not list(ctx.run_dir.glob("answer.*.json")) \
