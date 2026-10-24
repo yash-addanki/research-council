@@ -83,6 +83,30 @@ def cmd_status(cfg: Config) -> int:
     return 0
 
 
+def _notifier():
+    """WhatsApp notifier when its Keychain entries exist, else None."""
+    try:
+        from research_council.approvals import notifier_from_keychain
+        return notifier_from_keychain()
+    except Exception:
+        return None
+
+
+def cmd_tools(args, cfg: Config) -> int:
+    from research_council import tools
+    notifier = _notifier()
+    ask = notifier.ask if notifier else None
+    if args.cmd == "setup":
+        results = tools.setup(args.config, cfg.allowlist, ask)
+    else:
+        cmd = args.install_cmd[1:] if args.install_cmd[:1] == ["--"] else args.install_cmd
+        tool = tools.Tool(args.name, args.repo, ["sh", "-c", args.check], cmd)
+        results = tools.setup(args.config, cfg.allowlist, ask, tools=[tool])
+    for name, result in results.items():
+        print(f"{name}: {result}")
+    return 0 if "failed" not in results.values() else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="research")
     ap.add_argument("--config", type=Path, default=Path(os.environ.get("RESEARCH_COUNCIL_CONFIG", DEFAULT_CONFIG)))
@@ -97,18 +121,21 @@ def main(argv: list[str] | None = None) -> int:
     p_resume.add_argument("run_id")
     p_resume.add_argument("--dry-run", action="store_true")
     sub.add_parser("status", help="list recent runs")
+    sub.add_parser("setup", help="install the allowlisted research tools")
+    p_inst = sub.add_parser("install", help="install a new tool; asks on WhatsApp unless allowlisted")
+    p_inst.add_argument("name")
+    p_inst.add_argument("repo", help="owner/name on GitHub")
+    p_inst.add_argument("--check", required=True, help="shell command that succeeds when already installed")
+    p_inst.add_argument("install_cmd", nargs="+", help="install command, after --")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
     if args.cmd == "status":
         return cmd_status(cfg)
+    if args.cmd in ("setup", "install"):
+        return cmd_tools(args, cfg)
     notion = NotionClient(get_secret("notion_token"), cfg.notion_data_source_id)
-    notifier = None  # WhatsApp notifier is wired in by the approvals module when configured
-    try:
-        from research_council.approvals import notifier_from_keychain
-        notifier = notifier_from_keychain()
-    except Exception:
-        pass
+    notifier = _notifier()
     if args.cmd == "next":
         if args.ask_first:
             from research_council.quota import ask_first
