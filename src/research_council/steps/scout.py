@@ -7,13 +7,13 @@ from pathlib import Path
 
 from research_council.evidence import EvidenceItem, dedupe, now_iso
 from research_council.prompts import render
-from research_council.sources import github, hn
+from research_council.sources import agent_reach, github, hn
 from research_council.steps.context import RunContext
 from research_council.steps.util import parse_json
 
 log = logging.getLogger(__name__)
 SCOUTS = ["gemini", "codex", "claude"]  # cheapest-quota first; Claude quota is the scarcest
-SOCIAL_SOURCES = {"hn": hn.search}  # agent_reach / last30days register here when installed
+SOCIAL_SOURCES = {"hn": hn.search, **agent_reach.SOURCES}
 REPO_SOURCE = github.search
 SOCIAL_SHARE = 0.35
 

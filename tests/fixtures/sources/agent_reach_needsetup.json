@@ -1,0 +1,1 @@
+{"schema_version":1,"ok":false,"action":"reddit.search","result":null,"error":{"code":"NEED_SETUP","message":"reddit is not added","hint":"agent-reach add reddit"}}
