@@ -1,7 +1,7 @@
-Check whether a source supports a claim.
-
-Claim: $claim
+Check whether each source supports its claim. There are $count numbered pairs.
 
 $evidence
 
-Reply with ONLY this JSON: {"label": "supported|partial|unsupported", "quote": "the sentence from the source that decides it, or empty"}
+For each pair decide: "supported" (the source clearly says it), "partial" (says part of it or something weaker), or "unsupported" (does not say it, or contradicts it).
+
+Reply with ONLY this JSON: {"results": [{"n": 0, "label": "supported|partial|unsupported"}]}
