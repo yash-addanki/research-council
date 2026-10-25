@@ -160,3 +160,15 @@ def test_run_passes_devnull_stdin_and_tier_model(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake)
     ClaudeRunner(TIERS).run("hi", "top")
     assert seen["stdin"] == subprocess.DEVNULL and "t-model" in seen["argv"]
+
+
+@pytest.mark.parametrize("runner", [ClaudeRunner(TIERS), CodexRunner(TIERS), GeminiRunner(TIERS)])
+def test_run_strips_null_bytes_from_prompt(runner, monkeypatch):
+    seen = {}
+
+    def fake(argv, **kw):
+        seen["argv"] = argv
+        raise subprocess.TimeoutExpired(cmd="x", timeout=1)
+    monkeypatch.setattr(subprocess, "run", fake)
+    runner.run("evidence \x00 from a pdf\x01", "cheap", timeout_s=1)
+    assert not any("\x00" in a or "\x01" in a for a in seen["argv"])

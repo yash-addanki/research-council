@@ -37,3 +37,14 @@ def test_page_url_maps_github_repo_to_raw_readme():
     assert crawl.page_url("https://github.com/enricoros/big-AGI") == "https://raw.githubusercontent.com/enricoros/big-AGI/HEAD/README.md"
     assert crawl.page_url("https://github.com/a/b/issues/3") == "https://github.com/a/b/issues/3"
     assert crawl.page_url("https://example.com/x") == "https://example.com/x"
+
+
+def test_fetch_text_skips_pdf_and_binary():
+    pdf = httpx.Client(transport=httpx.MockTransport(
+        lambda req: httpx.Response(200, content=b"%PDF-1.7\x00\x00<![CDATA[", headers={"content-type": "application/pdf"})))
+    assert crawl.fetch_text("https://x.org/paper.pdf", client=pdf, use_crawl4ai=False) is None
+
+
+def test_fetch_text_removes_null_and_control_chars():
+    text = crawl.fetch_text("https://x.com", client=_client(200, "<p>a\x00b\x07c\nd</p>"), use_crawl4ai=False)
+    assert text == "abc d"
