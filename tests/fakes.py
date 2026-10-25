@@ -18,7 +18,7 @@ class FakeNotion:
     def set_props(self, page_id, **kw):
         self.calls.append(("props", page_id, kw))
 
-    def append_markdown(self, page_id, md):
+    def replace_report(self, page_id, md):
         self.calls.append(("append", page_id, md))
 
 

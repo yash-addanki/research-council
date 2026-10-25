@@ -37,7 +37,7 @@ def run(ctx: RunContext) -> Path:
         body = "\n\n".join(f"### Pair {n}\nClaim: {p['claim']}\nSource {p['url']}:\n{page}" for n, (p, page) in enumerate(batch))
         labels = {}
         for name in ctx.available(CHECKERS):
-            res = ctx.call(name, render("citation", count=str(len(batch)), evidence=body), "mid", step="citations")
+            res = ctx.call(name, render("citation", count=str(len(batch)), evidence=body), "cheap", step="citations")  # mid tier thought ~17k tokens per batch
             data = parse_json(res.text) if res.ok else None
             if isinstance(data, dict) and isinstance(data.get("results"), list):
                 labels = {r.get("n"): r.get("label") for r in data["results"] if isinstance(r, dict)}

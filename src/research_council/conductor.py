@@ -44,7 +44,7 @@ def report_step(ctx: RunContext) -> Path:
         print(full)
         print(summary)
     else:
-        ctx.notion.append_markdown(ctx.topic.page_id, full)
+        ctx.notion.replace_report(ctx.topic.page_id, full)
         ctx.notion.set_props(ctx.topic.page_id, run_id=ctx.run_id, tokens_used=total)
         ctx.notion.set_status(ctx.topic.page_id, "Resolved")
         if ctx.notifier:

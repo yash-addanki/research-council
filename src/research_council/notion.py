@@ -48,28 +48,90 @@ def chunk_text(s: str, limit: int = 2000) -> list[str]:
     return chunks
 
 
+_INLINE = re.compile(r"\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\((https?://[^)\s]+)\)")
+
+
 def _rt(text: str) -> list[dict]:
-    return [{"type": "text", "text": {"content": c}} for c in chunk_text(text, 2000)] or [
-        {"type": "text", "text": {"content": ""}}]
+    """Markdown inline -> Notion rich text: **bold**, `code` and [links](url); pieces stay under 2,000 chars."""
+    spans, pos = [], 0
+    for m in _INLINE.finditer(text):
+        if m.start() > pos:
+            spans.append((text[pos:m.start()], {}, None))
+        if m.group(1) is not None:
+            spans.append((m.group(1), {"bold": True}, None))
+        elif m.group(2) is not None:
+            spans.append((m.group(2), {"code": True}, None))
+        else:
+            spans.append((m.group(3), {}, m.group(4)))
+        pos = m.end()
+    if pos < len(text):
+        spans.append((text[pos:], {}, None))
+    out = []
+    for content, ann, url in spans:
+        for i in range(0, len(content), 2000):
+            item = {"type": "text", "text": {"content": content[i:i + 2000]}}
+            if url:
+                item["text"]["link"] = {"url": url}
+            if ann:
+                item["annotations"] = ann
+            out.append(item)
+    return out or [{"type": "text", "text": {"content": ""}}]
+
+
+def _table(lines: list[str]) -> dict:
+    rows = [[c.strip() for c in ln.strip().strip("|").split("|")] for ln in lines
+            if not re.match(r"^\|?\s*:?-{2,}", ln.strip().strip("|").strip())]
+    width = max(len(r) for r in rows)
+    return {"type": "table", "table": {"table_width": width, "has_column_header": True, "has_row_header": False,
+            "children": [{"type": "table_row", "table_row": {"cells": [_rt(c) for c in r + [""] * (width - len(r))]}}
+                         for r in rows]}}
+
+
+_LIST = re.compile(r"^(\s*)([-*]|\d+[.)]) (.*)")
 
 
 def markdown_to_blocks(md: str) -> list[dict]:
-    blocks = []
-    for para in md.split("\n\n"):
-        lines = para.strip().split("\n")
-        if not lines[0]:
+    blocks: list[dict] = []
+    para: list[str] = []
+    lines = md.split("\n")
+
+    def flush():
+        if para:
+            text = "\n".join(para)
+            blocks.extend({"type": "paragraph", "paragraph": {"rich_text": _rt(piece)}} for piece in chunk_text(text))
+            para.clear()
+
+    i = 0
+    while i < len(lines):
+        ln = lines[i]
+        if not ln.strip():
+            flush()
+        elif ln.lstrip().startswith("|"):
+            flush()
+            j = i
+            while j < len(lines) and lines[j].lstrip().startswith("|"):
+                j += 1
+            blocks.append(_table(lines[i:j]))
+            i = j
             continue
-        if all(re.match(r"^[-*] ", ln) for ln in lines):
-            for ln in lines:
-                blocks.append({"type": "bulleted_list_item", "bulleted_list_item": {"rich_text": _rt(ln[2:])}})
-            continue
-        m = re.match(r"^(#{1,3}) (.*)", lines[0])
-        if m and len(lines) == 1:
+        elif m := re.match(r"^(#{1,3}) (.*)", ln):
+            flush()
             kind = f"heading_{len(m.group(1))}"
             blocks.append({"type": kind, kind: {"rich_text": _rt(m.group(2))}})
-            continue
-        for piece in chunk_text("\n".join(lines), 2000 * 50):
-            blocks.append({"type": "paragraph", "paragraph": {"rich_text": _rt(piece)}})
+        elif m := _LIST.match(ln):
+            flush()
+            indent, marker, text = m.groups()
+            kind = "bulleted_list_item" if marker in "-*" else "numbered_list_item"
+            item = {"type": kind, kind: {"rich_text": _rt(text)}}
+            parent = blocks[-1] if blocks else None
+            if len(indent) >= 2 and parent and parent["type"].endswith("list_item"):
+                parent[parent["type"]].setdefault("children", []).append(item)  # Notion nests via children
+            else:
+                blocks.append(item)
+        else:
+            para.append(ln)
+        i += 1
+    flush()
     return blocks
 
 
@@ -145,6 +207,22 @@ class NotionClient:
         blocks = markdown_to_blocks(md)
         for i in range(0, len(blocks), 100):
             self._req("PATCH", f"/blocks/{page_id}/children", {"children": blocks[i:i + 100]})
+
+    def replace_report(self, page_id: str, md: str) -> None:
+        """Write the report, first removing an earlier one (from its "Answer" heading on) so re-runs don't stack."""
+        kids, cursor = [], None
+        while True:
+            q = f"?start_cursor={cursor}" if cursor else ""
+            data = self._req("GET", f"/blocks/{page_id}/children{q}")
+            kids += data["results"]
+            if not data.get("has_more"):
+                break
+            cursor = data["next_cursor"]
+        start = next((i for i, b in enumerate(kids) if b["type"] == "heading_2"
+                      and _plain({"rich_text": b["heading_2"]["rich_text"]}).strip() == "Answer"), None)
+        for b in kids[start:] if start is not None else []:
+            self._req("DELETE", f"/blocks/{b['id']}")
+        self.append_markdown(page_id, md)
 
     def ensure_schema(self) -> None:
         have = self._req("GET", f"/data_sources/{self.ds}")["properties"]
