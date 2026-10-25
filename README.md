@@ -24,8 +24,8 @@ Each run writes its steps to `runs/<date>-<slug>/` (`brief.json`, `evidence.json
 
 Run `scripts/setup.sh` from this folder; it creates `config.toml`, installs the tools and lists what is still missing. The steps only you can do:
 
-1. **Notion token.** Create an internal integration at notion.so/profile/integrations, share the ResearchTopics database with it (••• → Connections), then
-   `security add-generic-password -s research-council -a notion_token -w '<secret>'`
+1. **Notion token.** In a browser (not the desktop app) open https://www.notion.so/profile/integrations → New integration → Internal, capabilities Read/Update/Insert content. Copy the Internal Integration Secret (`ntn_…`). On the ResearchTopics database, ••• → Connections → add it. Then run
+   `security add-generic-password -s research-council -a notion_token -w` (prompts for the secret, so it stays out of shell history)
 2. **Gemini via Antigravity.** Google retired Gemini CLI sign-in for AI Pro accounts, so the Gemini member runs on `agy`: `curl -fsSL https://antigravity.google/cli/install.sh | bash`, then run `agy` once and sign in with your AI Pro Google account. (Done on the Mac 2026-10-25.)
 3. **Claude in Chrome** (High depth only). Install the Claude in Chrome extension, run `claude` then `/login` (not `setup-token`), and stay signed in to gemini.google.com, chatgpt.com and Muse in that Chrome.
 4. **WhatsApp approvals.** Follow `docs/whatsapp-setup.md` (Meta app, templates, Keychain entries). It needs a free Supabase project for the webhook relay; tell Claude when it's OK to create one.
@@ -34,7 +34,7 @@ Run `scripts/setup.sh` from this folder; it creates `config.toml`, installs the 
 
 ## Safety
 
-- Research steps run the CLIs read-only (`--tools ""` or web tools only for Claude, `--sandbox read-only` for Codex, `--approval-mode plan` for Gemini). Only the act step writes, and only stars, forks and clones.
+- Research steps run the CLIs read-only (`--tools ""` or web tools only for Claude, `--sandbox read-only` for Codex, `--mode plan` for agy). Only the act step writes, and only stars, forks and clones.
 - Web and social text is passed to models inside `<untrusted_evidence>` and never changes the plan.
 - Secrets live in the macOS Keychain under service `research-council`.
 - Tools outside `allowlist` in `config.toml` need a WhatsApp yes before install.
