@@ -25,10 +25,11 @@ Each run writes its steps to `runs/<date>-<slug>/` (`brief.json`, `evidence.json
 
 `plugins/bob-research` adds the council to Claude Code: a **Research Council** dashboard pane (every topic, its stage, evidence and citation counts, council answers, and tokens by model and by step, plus quota), a status line entry, and a toast/notification when a run finishes or gets blocked. It refreshes every 20 s.
 
-Install once, at a Claude Code prompt on the Mac (answer `y` to add the marketplace, then pick the user scope):
+Install once, in Terminal on the Mac (the local folder needs no GitHub sign-in, and `git pull` brings updates):
 
-```
-/plugin install bob-research --marketplace yash-addanki/research-council
+```sh
+claude plugin marketplace add ~/GitRepos/research-council
+claude plugin install bob-research@research-council
 ```
 
 Then:
