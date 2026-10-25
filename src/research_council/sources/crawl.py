@@ -29,6 +29,15 @@ class _Text(HTMLParser):
             self.parts.append(data)
 
 
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+TEXT_TYPES = ("text/html", "text/plain", "text/markdown", "application/xhtml")
+
+
+def clean_text(text: str) -> str:
+    """Drop NUL and other control characters: a CLI argument can't hold a NUL byte."""
+    return _CONTROL.sub("", text)
+
+
 def _html_to_text(html: str) -> str:
     parser = _Text()
     parser.feed(html)
@@ -64,8 +73,12 @@ def fetch_text(url: str, max_chars: int = 20000, client: httpx.Client | None = N
         except Exception as exc:
             log.warning("fetch failed for %s: %s", url, exc)
             return None
+        kind = resp.headers.get("content-type", "text/html").lower()
+        if not kind.startswith(TEXT_TYPES):
+            log.warning("skipping %s: not a web page (%s)", url, kind)
+            return None
         text = _html_to_text(resp.text)
-    return text[:max_chars]
+    return clean_text(text)[:max_chars]
 
 
 _GITHUB_REPO = re.compile(r"^https://github\.com/([\w.-]+)/([\w.-]+?)/?$")

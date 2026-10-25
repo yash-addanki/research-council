@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 
 from research_council.runners.base import RunResult
+from research_council.sources.crawl import clean_text
 
 LIMIT_MARKERS = ("429", "rate limit", "rate_limit", "usage limit", "usage_limit", "resource_exhausted", "quota")
 
@@ -30,7 +31,7 @@ class CliRunner:
         model = self.tiers[tier]
         try:
             # run outside the repo so no CLAUDE.md / AGENTS.md / GEMINI.md gets pulled into the prompt
-            proc = subprocess.run(self.build_argv(prompt, model, web), capture_output=True, text=True,
+            proc = subprocess.run(self.build_argv(clean_text(prompt), model, web), capture_output=True, text=True,
                                   timeout=timeout_s, stdin=subprocess.DEVNULL, cwd=tempfile.gettempdir())
         except subprocess.TimeoutExpired:
             return RunResult("", 0, 0, model, error=f"{self.name}: timed out after {timeout_s}s")
