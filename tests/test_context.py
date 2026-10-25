@@ -82,3 +82,39 @@ def test_call_refuses_over_token_budget_except_chairman(tmp_path):
     over = ctx.call("claude", "p", "cheap", step="council")
     assert not over.ok and "token budget" in over.error
     assert ctx.call("claude", "p", "top", step="chairman").ok  # the report still gets written
+
+
+def test_parallel_calls_reserve_budget_before_any_reports(tmp_path):
+    """Three reviewers starting together must not all pass a check that only counts finished calls."""
+    import threading
+    gate = threading.Event()
+
+    class Slow:
+        def run(self, prompt, tier, *, web=False, timeout_s=900):
+            gate.wait(2)
+            return RunResult("ok", len(prompt) // 4, 4000, "m")
+
+    ctx, _ = make_ctx(tmp_path, {"codex": Slow()}, depth="Low")  # Low budget 150k, 12% kept for the chairman
+    prompt = "x" * 4 * 50_000  # ~54k reserved per call: two fit under 132k, a third doesn't
+    out = []
+    threads = [threading.Thread(target=lambda: out.append(ctx.call("codex", prompt, "mid", step="review")))
+               for _ in range(3)]
+    for t in threads:
+        t.start()
+    for _ in range(100):  # wait until two calls are in flight
+        if ctx._reserved >= 2 * (50_000 + 4000):
+            break
+        threading.Event().wait(0.01)
+    gate.set()
+    for t in threads:
+        t.join()
+    assert sorted(r.ok for r in out) == [False, True, True]
+    assert ctx._reserved == 0
+
+
+def test_budget_keeps_room_for_chairman(tmp_path):
+    fake = FakeRunner("claude", [RunResult("x", 140_000, 0, "m"), RunResult("y", 1, 1, "m")])
+    ctx, _ = make_ctx(tmp_path, {"claude": fake}, depth="Low")  # 150k budget
+    assert ctx.call("claude", "p", "cheap", step="scout").ok
+    over = ctx.call("claude", "p", "cheap", step="review")  # 140k spent is past 88% of 150k
+    assert not over.ok and "token budget" in over.error

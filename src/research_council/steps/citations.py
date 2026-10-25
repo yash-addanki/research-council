@@ -5,7 +5,8 @@ from pathlib import Path
 from research_council.prompts import render
 from research_council.sources.crawl import best_passage, fetch_text, page_url
 from research_council.steps.context import RunContext
-from research_council.steps.council import load_answers
+from research_council.sources.run_history import PREFIX
+from research_council.steps.council import load_answers, load_evidence
 from research_council.steps.util import parse_json
 
 CHECKERS = ["gemini", "codex", "claude"]
@@ -23,9 +24,11 @@ def run(ctx: RunContext) -> Path:
             for url in c.get("source_urls", [])[:2]:
                 pairs.append({"member": member, "id": c["id"], "claim": c["claim"], "url": url})
     pairs = pairs[:MAX_PAIRS]
+    local = {e["url"]: e["excerpt"] for e in load_evidence(ctx) if e["url"].startswith(PREFIX)}
     results, to_check = [], []
     for p in pairs:
-        page = fetch_text(page_url(p["url"]), max_chars=60000)
+        # a past-run summary has no web page; check the claim against the summary the council read
+        page = local.get(p["url"]) if p["url"].startswith(PREFIX) else fetch_text(page_url(p["url"]), max_chars=60000)
         if page is not None:
             page = best_passage(page, p["claim"], PAGE_CHARS)  # the part of the page about this claim
         if page is None:

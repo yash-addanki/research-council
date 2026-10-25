@@ -1,4 +1,5 @@
 import json
+import pytest
 
 from research_council.evidence import EvidenceItem
 from research_council.runners.base import FakeRunner, RunResult
@@ -249,3 +250,48 @@ def test_ensure_unverified_skips_paraphrased_claims():
     out = chairman.ensure_unverified(report, ["llm-council README says it is 99% vibe coded and unsupported by the author",
                                               "Mistral Large 3 costs $0.50 per million input tokens"])
     assert "vibe coded and unsupported by the author" not in out and "Mistral Large 3" in out
+
+
+# --- run history as evidence
+def _past_run(runs_dir, name, ctx):
+    d = runs_dir / name
+    d.mkdir()
+    (d / "topic.json").write_text(json.dumps({"title": "Old topic", "page_id": "p0", "depth": "High"}))
+    (d / "evidence.jsonl").write_text('{"url": "https://a"}\n')
+    (d / "missing.json").write_text(json.dumps({"gemini": "empty reply; denied tools: RunCommand"}))
+    ctx.state.record_usage(name, "council", "codex", 90_000, 5_000, 1.0)
+
+
+def test_scout_adds_past_runs_for_topics_about_this_tool(make_ctx, monkeypatch):
+    ctx = make_ctx()
+    _past_run(ctx.run_dir.parent, "old-run", ctx)
+    ctx.write_json("brief.json", {**BRIEF, "about_this_tool": True})
+    (ctx.run_dir / "topic.json").write_text(json.dumps({"title": "now", "page_id": "p1"}))
+    monkeypatch.setattr(scout, "web_search", lambda ctx, qs, limit: [ev("w")])
+    monkeypatch.setattr(scout, "SOCIAL_SOURCES", {})
+    monkeypatch.setattr(scout, "REPO_SOURCE", lambda q, limit: [])
+    items = [json.loads(l) for l in scout.run(ctx).read_text().splitlines()]
+    hist = [i for i in items if i["platform"] == "run-history"]
+    assert [i["url"] for i in hist] == ["runs://old-run"]  # the current run is not its own evidence
+    facts = json.loads(hist[0]["excerpt"])
+    assert facts["tokens"]["total"] == 95_000 and "denied tools" in facts["council_member_errors"]["gemini"]
+
+
+def test_scout_leaves_run_history_out_of_other_topics(make_ctx, monkeypatch):
+    ctx = make_ctx()
+    _past_run(ctx.run_dir.parent, "old-run", ctx)
+    ctx.write_json("brief.json", BRIEF)
+    monkeypatch.setattr(scout, "web_search", lambda ctx, qs, limit: [ev("w")])
+    monkeypatch.setattr(scout, "SOCIAL_SOURCES", {})
+    monkeypatch.setattr(scout, "REPO_SOURCE", lambda q, limit: [])
+    assert all(json.loads(l)["platform"] != "run-history" for l in scout.run(ctx).read_text().splitlines())
+
+
+def test_citations_check_run_history_claims_against_the_summary(make_ctx, monkeypatch):
+    fake = FakeRunner("gemini", [ok({"results": [{"n": 0, "label": "supported"}]})])
+    ctx = make_ctx({"gemini": fake})
+    ctx.path("evidence.jsonl").write_text(json.dumps({"url": "runs://old", "excerpt": '{"tokens": {"total": 95000}}'}) + "\n")
+    ctx.write_json("answer.claude.json", answer([{"id": "c1", "claim": "used 95k", "source_urls": ["runs://old"], "confidence": 0.9}]))
+    monkeypatch.setattr(citations, "fetch_text", lambda url, **k: pytest.fail("runs:// is not fetched"))
+    data = json.loads(citations.run(ctx).read_text())
+    assert data[0]["label"] == "supported" and "95000" in fake.calls[0][0]
