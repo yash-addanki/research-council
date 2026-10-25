@@ -23,5 +23,5 @@ for k in notion_token wa_token wa_phone_id wa_to relay_url relay_secret; do
   security find-generic-password -s research-council -a "$k" >/dev/null 2>&1 || missing+=("$k")
 done
 (( ${#missing} )) && echo "Keychain entries still needed: ${missing[*]} (see README)"
-gemini --version >/dev/null 2>&1 && echo "gemini: installed (sign in once by running: gemini)"
+agy --version >/dev/null 2>&1 || echo "agy (Antigravity CLI) missing: curl -fsSL https://antigravity.google/cli/install.sh | bash, then run agy once to sign in"
 echo "done. Try: uv run research next --dry-run"

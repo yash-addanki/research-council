@@ -28,7 +28,6 @@ TOOLS = [
     Tool("uv", "astral-sh/uv", ["uv", "--version"], ["brew", "install", "uv"]),
     Tool("gh", "cli/cli", ["gh", "--version"], ["brew", "install", "gh"]),
     Tool("codex", "openai/codex", ["codex", "--version"], ["npm", "install", "-g", "@openai/codex"]),
-    Tool("gemini", "google-gemini/gemini-cli", ["gemini", "--version"], ["npm", "install", "-g", "@google/gemini-cli"]),
     Tool("crawl4ai", "unclecode/crawl4ai", ["uv", "run", "python", "-c", "import crawl4ai"],
          _sh("uv sync --extra crawl && uv run crawl4ai-setup")),
     Tool("agent-reach", "Panniantong/Agent-Reach", ["agent-reach", "--version"],

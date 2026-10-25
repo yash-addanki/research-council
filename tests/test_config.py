@@ -9,7 +9,7 @@ EXAMPLE = Path(__file__).parent.parent / "config.example.toml"
 def test_load_config_reads_tiers():
     cfg = load_config(EXAMPLE)
     assert cfg.tiers["claude"]["top"] == "opus"
-    assert cfg.tiers["gemini"]["cheap"] == "gemini-2.5-flash"
+    assert cfg.tiers["gemini"]["cheap"] == "gemini-3.8-flash-low"
 
 
 def test_load_config_reads_caps_and_paths():

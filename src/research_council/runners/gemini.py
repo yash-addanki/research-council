@@ -1,4 +1,9 @@
-"""gemini -p runner (Google AI Pro login). In JSON mode errors arrive on stderr with empty stdout."""
+"""Gemini council member via the Antigravity CLI (`agy -p`). Google retired Gemini CLI sign-in for AI Pro accounts.
+
+Plan mode keeps it read-only; headless mode auto-denies tools needing permission, so it has no live web search
+and answers from the evidence pack. Errors come as status ERROR with an `error` field, and a denied tool can
+yield SUCCESS with an empty response, so both count as failures.
+"""
 
 import json
 
@@ -10,24 +15,19 @@ class GeminiRunner(CliRunner):
     name = "gemini"
 
     def build_argv(self, prompt: str, model: str, web: bool) -> list[str]:
-        # google_web_search is built in; plan mode keeps it read-only either way
-        return ["gemini", "-p", prompt, "--output-format", "json", "-m", model, "--approval-mode", "plan"]
+        return ["agy", "-p", prompt, "--output-format", "json", "--model", model, "--mode", "plan"]
 
     def parse(self, stdout: str, stderr: str, returncode: int) -> RunResult:
-        raw = stdout if (stdout or "").strip() else stderr
         try:
-            data = json.loads(raw)
+            data = json.loads(stdout)
         except (json.JSONDecodeError, TypeError):
-            msg = (raw or "").strip()[:500]
+            msg = ((stdout or "") + (stderr or "")).strip()[:500]
             return RunResult("", 0, 0, "", rate_limited=looks_rate_limited(msg), error=f"gemini: bad output: {msg}")
-        models = (data.get("stats") or {}).get("models") or {}
-        tin = sum(m.get("tokens", {}).get("input", 0) for m in models.values())
-        tout = sum(m.get("tokens", {}).get("candidates", 0) + m.get("tokens", {}).get("thoughts", 0)
-                   for m in models.values())
-        model = next(iter(models), "")
-        if data.get("error"):
-            err = data["error"]
-            msg = str(err.get("message", ""))
-            limited = err.get("code") == 429 or looks_rate_limited(msg)
-            return RunResult("", tin, tout, model, rate_limited=limited, error=f"gemini: {msg}")
-        return RunResult(data.get("response", ""), tin, tout, model)
+        usage = data.get("usage") or {}
+        tin, tout = usage.get("input_tokens", 0), usage.get("output_tokens", 0)
+        text = (data.get("response") or "").strip()
+        if data.get("status") != "SUCCESS" or not text:
+            denied = ", ".join(a.get("display_name", "") for a in data.get("denied_actions") or [])
+            msg = data.get("error") or (f"empty reply; denied tools: {denied}" if denied else "empty reply")
+            return RunResult("", tin, tout, "", rate_limited=looks_rate_limited(msg), error=f"gemini: {msg}"[:500])
+        return RunResult(text, tin, tout, "")

@@ -20,6 +20,8 @@ def test_not_busy_for_headless_claude_p():
 def test_busy_when_interactive_claude_running():
     assert quota.user_busy(["/Users/y/.local/bin/claude"], hid_idle_s=3600)
     assert quota.user_busy(["node /usr/local/bin/gemini"], hid_idle_s=3600)
+    assert quota.user_busy(["/Users/y/.local/bin/agy"], hid_idle_s=3600)
+    assert not quota.user_busy(["/Users/y/.local/bin/agy -p hi --output-format json"], hid_idle_s=3600)
     assert quota.user_busy(["/opt/homebrew/bin/codex resume"], hid_idle_s=3600)
 
 

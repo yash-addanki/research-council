@@ -79,25 +79,31 @@ def test_codex_argv_readonly_and_web():
 
 
 # ---- Gemini
-def test_gemini_parse_ok_fixture():
-    r = GeminiRunner(TIERS).parse(fx("gemini_ok.synthetic.json"), "", 0)
-    assert r.ok and r.text == "OK" and r.tokens_in == 812 and r.tokens_out == 2 + 16
+def test_gemini_parse_agy_ok_fixture():
+    r = GeminiRunner(TIERS).parse(fx("agy.ok.json"), "", 0)
+    assert r.ok and r.text == "OK" and (r.tokens_in, r.tokens_out) == (9048, 1390)
 
 
-def test_gemini_auth_error_on_stderr():
-    r = GeminiRunner(TIERS).parse("", fx("gemini_auth_error.json"), 41)
-    assert not r.ok and "Auth method" in r.error and not r.rate_limited
+def test_gemini_empty_reply_with_denied_tool_is_error():
+    r = GeminiRunner(TIERS).parse(fx("agy.web.json"), fx("agy.web.stderr"), 0)
+    assert not r.ok and "RunCommand" in r.error and r.tokens_in == 29434
 
 
-def test_gemini_quota_error_is_rate_limited():
-    r = GeminiRunner(TIERS).parse("", fx("gemini_quota_error.synthetic.json"), 1)
-    assert r.rate_limited
+def test_gemini_bad_model_is_error_not_rate_limit():
+    r = GeminiRunner(TIERS).parse(fx("agy.badmodel.json"), "error: invalid model selection", 1)
+    assert not r.ok and "invalid model selection" in r.error and not r.rate_limited
 
 
-def test_gemini_argv_readonly():
+def test_gemini_non_json_output_is_error():
+    r = GeminiRunner(TIERS).parse("", "error: quota exhausted for Gemini Models", 1)
+    assert not r.ok and r.rate_limited
+
+
+def test_gemini_argv_uses_agy_plan_mode():
     argv = GeminiRunner(TIERS).build_argv("hi", "m-model", web=True)
-    assert argv[argv.index("--approval-mode") + 1] == "plan"
-    assert argv[argv.index("-m") + 1] == "m-model"
+    assert argv[:3] == ["agy", "-p", "hi"]
+    assert argv[argv.index("--mode") + 1] == "plan" and argv[argv.index("--model") + 1] == "m-model"
+    assert "--dangerously-skip-permissions" not in argv
 
 
 # ---- shared run() behaviour

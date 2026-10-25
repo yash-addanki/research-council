@@ -40,7 +40,7 @@ def user_busy(process_cmds: list[str], hid_idle_s: float) -> bool:
         if any(app in cmd for app in APPS):
             return True
         if (_interactive(cmd, "claude", ("-p", "--print")) or _interactive(cmd, "codex", ("exec",))
-                or _interactive(cmd, "gemini", ("-p", "--prompt"))):
+                or _interactive(cmd, "gemini", ("-p", "--prompt")) or _interactive(cmd, "agy", ("-p", "--print", "--prompt"))):
             return True
     return False
 

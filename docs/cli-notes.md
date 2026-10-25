@@ -151,3 +151,16 @@ Not installed: not in `~/.claude/skills` and not in the installed plugins (only 
 ## andrej-karpathy-skills
 
 `~/GitRepos/andrej-karpathy-skills` already existed as an empty, never-checked-out git dir (no fetch refspec). I added the refspec, fetched, and checked out `main` at 2c60614 ("Sync Chinese README with English version…"). Contents: CLAUDE.md, CURSOR.md, EXAMPLES.md, README.md, README.zh.md, skills/.
+
+---
+
+## agy (Antigravity CLI) — replaces gemini (2026-10-25)
+
+Gemini CLI 0.65 sign-in now fails for AI Pro personal accounts: "This client is no longer supported for Gemini Code Assist for individuals… migrate to the Antigravity suite". Installed `agy` 1.4.7 via `curl -fsSL https://antigravity.google/cli/install.sh | bash` (Google-hosted binary, SHA-512 checked) into `~/.local/bin`. It reused the existing Google sign-in.
+
+- Headless: `agy -p "<prompt>" --output-format json --model <id> --mode plan`. Other flags: `--effort`, `--print-timeout`, `--json-schema`, `--sandbox`.
+- Output: one JSON object `{conversation_id, status, response, duration_seconds, num_turns, usage{input_tokens, output_tokens, thinking_tokens, cache_read_tokens, total_tokens}, denied_actions?, error?}` (fixtures `agy.*.json`). output_tokens includes thinking.
+- Errors: `status: "ERROR"` with `error` text, exit 1, same text on stderr (`agy.badmodel.*`).
+- Web search: in headless plan mode the search tool needs the "command" permission and is auto-denied, giving `status: SUCCESS` with an empty response and `denied_actions` (`agy.web.*`). The runner treats an empty reply as failure; the Gemini member answers from the evidence pack. `--dangerously-skip-permissions` is not used.
+- Models (`agy models`, AI Pro): gemini-3.8-flash-{high,medium,low}, claude-sonnet-4-6, claude-opus-4-6-thinking, gpt-oss-120b-medium.
+- Quota: `agy -p "/usage" --output-format json` → `command.data.groups[].buckets[]` with `window` (weekly/5h), `remaining_fraction`, `reset_time`; groups "Gemini Models" and "Claude and GPT models". Not wired into quota.py yet (cooldowns on rate-limit errors still apply).

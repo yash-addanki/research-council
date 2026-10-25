@@ -1,1 +1,0 @@
-{"session_id":"synthetic","error":{"type":"Error","message":"[API Error: RESOURCE_EXHAUSTED: Quota exceeded for quota metric 'Gemini requests per day']","code":429}}
