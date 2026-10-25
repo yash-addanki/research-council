@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from research_council.prompts import render
-from research_council.sources.crawl import fetch_text
+from research_council.sources.crawl import best_passage, fetch_text, page_url
 from research_council.steps.context import RunContext
 from research_council.steps.council import load_answers
 from research_council.steps.util import parse_json
@@ -25,7 +25,9 @@ def run(ctx: RunContext) -> Path:
     pairs = pairs[:MAX_PAIRS]
     results, to_check = [], []
     for p in pairs:
-        page = fetch_text(p["url"], max_chars=PAGE_CHARS)
+        page = fetch_text(page_url(p["url"]), max_chars=60000)
+        if page is not None:
+            page = best_passage(page, p["claim"], PAGE_CHARS)  # the part of the page about this claim
         if page is None:
             results.append({"member": p["member"], "id": p["id"], "url": p["url"], "label": "unreachable"})
         else:

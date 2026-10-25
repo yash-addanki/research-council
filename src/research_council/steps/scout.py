@@ -8,26 +8,37 @@ from pathlib import Path
 from research_council.evidence import EvidenceItem, dedupe, now_iso
 from research_council.prompts import render
 from research_council.sources import agent_reach, github, hn
+from research_council.sources.crawl import best_passage, fetch_text, page_url
 from research_council.steps.context import RunContext
 from research_council.steps.util import parse_json
 
 log = logging.getLogger(__name__)
-SCOUTS = ["gemini", "codex", "claude"]  # cheapest-quota first; Claude quota is the scarcest
+SCOUTS = ["codex", "claude"]  # need live web search (agy has none headless); Claude quota is the scarcest
 SOCIAL_SOURCES = {"hn": hn.search, **agent_reach.SOURCES}
 REPO_SOURCE = github.search
 SOCIAL_SHARE = 0.35
+EXCERPT_CHARS = 1500
 
 
-def web_search(ctx: RunContext, query: str, limit: int) -> list[EvidenceItem]:
+def web_search(ctx: RunContext, queries: list[str], limit: int) -> list[EvidenceItem]:
+    """One web-search call covers every angle; a call per angle re-pays the CLI's fixed overhead each time."""
     question = ctx.read_json("brief.json")["question"]
+    prompt = render("scout", queries="\n".join(f"- {q}" for q in queries), question=question, limit=str(limit))
     for name in ctx.available(SCOUTS):
-        res = ctx.call(name, render("scout", query=query, question=question, limit=str(limit)), "cheap",
-                       step="scout", web=True)
+        res = ctx.call(name, prompt, "cheap", step="scout", web=True)
         rows = parse_json(res.text) if res.ok else None
         if isinstance(rows, list):
             return [EvidenceItem(r["url"], r.get("title", ""), "web", r.get("excerpt", ""), r.get("published_at"),
                                  now_iso()) for r in rows if isinstance(r, dict) and r.get("url")]
     return []
+
+
+def with_page_text(item: EvidenceItem, question: str) -> EvidenceItem:
+    """Swap a model-written summary for the page's own most relevant passage, so later checks see real text."""
+    page = fetch_text(page_url(item.url), max_chars=60000)
+    if page and len(page) > len(item.excerpt):
+        item.excerpt = best_passage(page, f"{question} {item.title}", EXCERPT_CHARS)
+    return item
 
 
 def _safe(fn, *args) -> list[EvidenceItem]:
@@ -43,10 +54,10 @@ def run(ctx: RunContext) -> Path:
     cap = ctx.cfg.caps[f"evidence_{ctx.depth.lower()}"]
     per = max(3, cap // max(1, len(brief["angles"])))
     with ThreadPoolExecutor(4) as pool:
-        web = pool.map(lambda q: _safe(web_search, ctx, q, per), brief["angles"])
+        web = [pool.submit(_safe, web_search, ctx, brief["angles"], cap)]
         social = [pool.submit(_safe, fn, q, per) for q in brief["social_queries"] for fn in SOCIAL_SOURCES.values()]
         repos = [pool.submit(_safe, REPO_SOURCE, q, 10) for q in brief.get("repo_queries", [])]
-        web_items = dedupe([i for chunk in web for i in chunk])
+        web_items = dedupe([i for f in web for i in f.result()])
         social_items = dedupe([i for f in social for i in f.result()])
         repo_items = dedupe([i for f in repos for i in f.result()])
     # keep a guaranteed share for social and repo evidence, fill the rest with web
@@ -56,6 +67,8 @@ def run(ctx: RunContext) -> Path:
     chosen += web_items[: cap - len(chosen)]
     leftovers = social_items[n_social:] + repo_items[n_repo:]
     chosen = dedupe(chosen + leftovers)[:cap]
+    with ThreadPoolExecutor(4) as pool:
+        chosen = list(pool.map(lambda i: with_page_text(i, brief["question"]) if i.platform == "web" else i, chosen))
     path = ctx.path("evidence.jsonl")
     path.write_text("".join(json.dumps(i.to_dict(), ensure_ascii=False) + "\n" for i in chosen))
     return path

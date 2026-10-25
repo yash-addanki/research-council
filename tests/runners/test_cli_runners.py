@@ -47,6 +47,28 @@ def test_claude_argv_readonly_and_web():
     assert web[web.index("--model") + 1] == "m-model"
 
 
+def test_claude_argv_skips_user_plugins_hooks_and_mcp():
+    # measured on the Mac: default 148,567 input tokens for "OK", lean flags 935
+    argv = ClaudeRunner(TIERS).build_argv("hi", "m-model", web=False)
+    assert argv[argv.index("--setting-sources") + 1] == ""
+    assert "--strict-mcp-config" in argv and "--no-session-persistence" in argv and "--system-prompt" in argv
+
+
+def test_chrome_runner_keeps_user_settings():
+    argv = ClaudeRunner(TIERS, chrome=True).build_argv("hi", "m-model", web=False)
+    assert "--chrome" in argv and "--setting-sources" not in argv and "--strict-mcp-config" not in argv
+
+
+def test_runners_start_outside_any_repo(monkeypatch):
+    seen = {}
+    def fake_run(argv, **kw):
+        seen.update(kw)
+        raise subprocess.TimeoutExpired(cmd="x", timeout=1)
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    ClaudeRunner(TIERS).run("hi", "cheap", timeout_s=1)
+    assert seen["cwd"] and not (Path(seen["cwd"]) / "CLAUDE.md").exists()
+
+
 # ---- Codex
 def test_codex_parse_ok_fixture():
     r = CodexRunner(TIERS).parse(fx("codex_ok.jsonl"), "", 0)
@@ -101,9 +123,14 @@ def test_gemini_non_json_output_is_error():
 
 def test_gemini_argv_uses_agy_plan_mode():
     argv = GeminiRunner(TIERS).build_argv("hi", "m-model", web=True)
-    assert argv[:3] == ["agy", "-p", "hi"]
+    assert argv[:2] == ["agy", "-p"]
     assert argv[argv.index("--mode") + 1] == "plan" and argv[argv.index("--model") + 1] == "m-model"
     assert "--dangerously-skip-permissions" not in argv
+
+
+def test_gemini_prompt_forbids_tools():
+    argv = GeminiRunner(TIERS).build_argv("hi", "m-model", web=False)
+    assert argv[2].endswith("hi") and "Do not use any tools" in argv[2]
 
 
 # ---- shared run() behaviour

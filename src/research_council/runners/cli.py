@@ -1,6 +1,7 @@
 """Shared subprocess handling for the model CLIs."""
 
 import subprocess
+import tempfile
 
 from research_council.runners.base import RunResult
 
@@ -28,8 +29,9 @@ class CliRunner:
     def run(self, prompt: str, tier: str, *, web: bool = False, timeout_s: int = 900) -> RunResult:
         model = self.tiers[tier]
         try:
+            # run outside the repo so no CLAUDE.md / AGENTS.md / GEMINI.md gets pulled into the prompt
             proc = subprocess.run(self.build_argv(prompt, model, web), capture_output=True, text=True,
-                                  timeout=timeout_s, stdin=subprocess.DEVNULL)
+                                  timeout=timeout_s, stdin=subprocess.DEVNULL, cwd=tempfile.gettempdir())
         except subprocess.TimeoutExpired:
             return RunResult("", 0, 0, model, error=f"{self.name}: timed out after {timeout_s}s")
         except FileNotFoundError:

@@ -35,3 +35,9 @@ BRIEF = {"question": "Which local LLM is best for coding?", "reading_chosen": ""
 
 def answer(claims, conclusion="Use X", repos=None):
     return {"conclusion": conclusion, "claims": claims, "repos": repos or [], "open_questions": []}
+
+
+@pytest.fixture(autouse=True)
+def _no_network_fetch(monkeypatch):
+    from research_council.steps import scout
+    monkeypatch.setattr(scout, "fetch_text", lambda url, **k: None)

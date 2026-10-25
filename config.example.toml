@@ -24,6 +24,10 @@ mid = "gemini-3.8-flash-medium"
 top = "gemini-3.8-flash-high"
 
 [caps]
+# hard token budget per run; once reached only the chairman may still call a model
+tokens_low = 150000
+tokens_medium = 250000
+tokens_high = 400000
 evidence_low = 30
 evidence_medium = 45
 evidence_high = 60

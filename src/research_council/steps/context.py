@@ -8,6 +8,7 @@ from typing import Callable
 
 from research_council.config import Config
 from research_council.notion import Topic
+from research_council.tokens import total_tokens
 from research_council.runners.base import RunResult, Runner
 from research_council.state import State
 
@@ -37,6 +38,9 @@ class RunContext:
             return RunResult("", 0, 0, runner_name, error=f"{runner_name}: not configured")
         if self.state.in_cooldown(runner_name, now):
             return RunResult("", 0, 0, runner_name, error=f"{runner_name}: in cooldown")
+        budget = self.cfg.caps.get(f"tokens_{self.depth.lower()}")
+        if budget and step != "chairman" and total_tokens(self.state.usage_for_run(self.run_id)) >= budget:
+            return RunResult("", 0, 0, runner_name, error=f"token budget {budget:,} for {self.depth} reached")
         cap = self.cfg.caps["calls_per_model_per_run"]
         if self._calls.get(runner_name, 0) >= cap:
             return RunResult("", 0, 0, runner_name, error=f"{runner_name}: per-run call cap {cap} reached")

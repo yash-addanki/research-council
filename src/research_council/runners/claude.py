@@ -6,6 +6,9 @@ from research_council.runners.base import RunResult
 from research_council.runners.cli import CliRunner, looks_rate_limited
 
 WEB_TOOLS = "WebSearch,WebFetch"
+SYSTEM = "You are a careful research assistant. Follow the requested output format exactly."
+# Without these, every call loads the user's plugins, hooks, skills and MCP servers (~145k input tokens).
+LEAN = ["--setting-sources", "", "--strict-mcp-config", "--no-session-persistence", "--system-prompt", SYSTEM]
 
 
 class ClaudeRunner(CliRunner):
@@ -20,9 +23,9 @@ class ClaudeRunner(CliRunner):
         argv = ["claude", "-p", prompt, "--output-format", "json", "--model", model, "--tools", tools]
         if web:
             argv += ["--allowedTools", WEB_TOOLS]
-        if self.chrome:
-            argv += ["--chrome", "--allowedTools", "mcp__claude-in-chrome__*"]
-        return argv
+        if self.chrome:  # the Chrome extension connection comes from the user's own setup
+            return argv + ["--chrome", "--allowedTools", "mcp__claude-in-chrome__*"]
+        return argv + LEAN
 
     def parse(self, stdout: str, stderr: str, returncode: int) -> RunResult:
         try:
