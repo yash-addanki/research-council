@@ -7,7 +7,7 @@ from pathlib import Path
 
 from research_council.evidence import EvidenceItem, dedupe, now_iso
 from research_council.prompts import render
-from research_council.sources import agent_reach, github, hn
+from research_council.sources import agent_reach, github, hn, run_history
 from research_council.sources.crawl import best_passage, fetch_text, page_url
 from research_council.steps.context import RunContext
 from research_council.steps.util import parse_json
@@ -69,6 +69,8 @@ def run(ctx: RunContext) -> Path:
     chosen = dedupe(chosen + leftovers)[:cap]
     with ThreadPoolExecutor(4) as pool:
         chosen = list(pool.map(lambda i: with_page_text(i, brief["question"]) if i.platform == "web" else i, chosen))
+    if brief.get("about_this_tool"):  # the tool's own runs are the evidence the web can't have
+        chosen = run_history.items(ctx.run_dir.parent, ctx.state, ctx.clock(), skip=ctx.run_dir.name) + chosen
     path = ctx.path("evidence.jsonl")
     path.write_text("".join(json.dumps(i.to_dict(), ensure_ascii=False) + "\n" for i in chosen))
     return path
