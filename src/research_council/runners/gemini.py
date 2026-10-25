@@ -11,11 +11,15 @@ from research_council.runners.base import RunResult
 from research_council.runners.cli import CliRunner, looks_rate_limited
 
 
+NO_TOOLS = ("Answer only from the text in this message. Do not use any tools, run commands, read files or browse; "
+            "a tool call is denied and leaves you with no answer.\n\n")
+
+
 class GeminiRunner(CliRunner):
     name = "gemini"
 
     def build_argv(self, prompt: str, model: str, web: bool) -> list[str]:
-        return ["agy", "-p", prompt, "--output-format", "json", "--model", model, "--mode", "plan"]
+        return ["agy", "-p", NO_TOOLS + prompt, "--output-format", "json", "--model", model, "--mode", "plan"]
 
     def parse(self, stdout: str, stderr: str, returncode: int) -> RunResult:
         try:

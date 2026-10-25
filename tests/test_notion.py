@@ -123,3 +123,50 @@ def test_ensure_schema_adds_missing():
     nc.ensure_schema()
     added = json.loads(rec.requests[1].content)["properties"]
     assert set(added) == {"Run ID", "Tokens used", "Report"}
+
+
+def _text(rich):
+    return "".join(r["text"]["content"] for r in rich)
+
+
+def test_markdown_table_becomes_notion_table():
+    md = "| Tool | License |\n|---|---|\n| big-AGI | MIT |\n| FastChat | Apache-2.0 |"
+    [table] = markdown_to_blocks(md)
+    assert table["type"] == "table" and table["table"]["table_width"] == 2 and table["table"]["has_column_header"]
+    rows = table["table"]["children"]
+    assert len(rows) == 3 and _text(rows[1]["table_row"]["cells"][0]) == "big-AGI"
+
+
+def test_nested_bullets_become_children():
+    blocks = markdown_to_blocks("- parent\n  - child one\n  - child two\n- next")
+    assert [b["type"] for b in blocks] == ["bulleted_list_item", "bulleted_list_item"]
+    kids = blocks[0]["bulleted_list_item"]["children"]
+    assert [_text(k["bulleted_list_item"]["rich_text"]) for k in kids] == ["child one", "child two"]
+
+
+def test_inline_bold_code_and_links_are_annotated():
+    [p] = markdown_to_blocks("Use **big-AGI** with `promptfoo`, see [docs](https://x.dev).")
+    rich = p["paragraph"]["rich_text"]
+    assert _text(rich) == "Use big-AGI with promptfoo, see docs."
+    bold = next(r for r in rich if r["text"]["content"] == "big-AGI")
+    code = next(r for r in rich if r["text"]["content"] == "promptfoo")
+    link = next(r for r in rich if r["text"]["content"] == "docs")
+    assert bold["annotations"]["bold"] and code["annotations"]["code"] and link["text"]["link"]["url"] == "https://x.dev"
+
+
+def test_numbered_list_and_heading_inside_paragraph_block():
+    blocks = markdown_to_blocks("**Next steps**\n1. pilot\n2. score")
+    assert [b["type"] for b in blocks] == ["paragraph", "numbered_list_item", "numbered_list_item"]
+
+
+def test_replace_report_deletes_old_report_blocks_only():
+    kids = {"results": [
+        {"id": "note", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "my own note"}]}},
+        {"id": "h", "type": "heading_2", "heading_2": {"rich_text": [{"plain_text": "Answer"}]}},
+        {"id": "old", "type": "paragraph", "paragraph": {"rich_text": [{"plain_text": "old report"}]}},
+    ], "has_more": False}
+    nc, rec = _client([(200, kids, None), (200, {}, None), (200, {}, None), (200, {"results": []}, None)])
+    nc.replace_report("p1", "## Answer\n\nnew")
+    calls = [(r.method, r.url.path) for r in rec.requests]
+    assert calls == [("GET", "/v1/blocks/p1/children"), ("DELETE", "/v1/blocks/h"), ("DELETE", "/v1/blocks/old"),
+                     ("PATCH", "/v1/blocks/p1/children")]

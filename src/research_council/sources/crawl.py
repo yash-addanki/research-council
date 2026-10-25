@@ -66,3 +66,27 @@ def fetch_text(url: str, max_chars: int = 20000, client: httpx.Client | None = N
             return None
         text = _html_to_text(resp.text)
     return text[:max_chars]
+
+
+_GITHUB_REPO = re.compile(r"^https://github\.com/([\w.-]+)/([\w.-]+?)/?$")
+
+
+def page_url(url: str) -> str:
+    """A GitHub repo page is mostly navigation; its README says what the repo is."""
+    m = _GITHUB_REPO.match(url)
+    return f"https://raw.githubusercontent.com/{m[1]}/{m[2]}/HEAD/README.md" if m else url
+
+
+def _words(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if len(w) > 2}
+
+
+def best_passage(text: str, query: str, size: int = 1500) -> str:
+    """The window of the page sharing the most words with the query (pages open with menus, not facts)."""
+    if len(text) <= size:
+        return text
+    want = _words(query)
+    step = max(1, size // 3)
+    starts = range(0, len(text) - size + step, step)
+    best = max(starts, key=lambda i: len(want & _words(text[i:i + size])))
+    return text[best:best + size]

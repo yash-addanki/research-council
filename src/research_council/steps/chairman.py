@@ -1,6 +1,7 @@
 """Step 8: the top Claude model writes the final report; repos are ranked deterministically."""
 
 import json
+import re
 from pathlib import Path
 
 from research_council.prompts import render
@@ -28,8 +29,14 @@ def unverified_claims(answers: dict, citations: list[dict]) -> list[str]:
             if (m, c["id"]) in support and not is_supported(support[(m, c["id"])])]
 
 
+def _covered(claim: str, report_words: set[str]) -> bool:
+    words = {w for w in re.findall(r"[a-z0-9$.%]+", claim.lower()) if len(w) > 2}
+    return not words or len(words & report_words) / len(words) >= 0.6  # the chairman paraphrases
+
+
 def ensure_unverified(report: str, claims: list[str]) -> str:
-    absent = [c for c in claims if c not in report]
+    report_words = set(re.findall(r"[a-z0-9$.%]+", report.lower()))
+    absent = [c for c in claims if not _covered(c, report_words)]
     if not absent:
         return report
     bullets = "".join(f"- {c}\n" for c in absent)

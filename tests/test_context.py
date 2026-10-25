@@ -72,3 +72,13 @@ def test_call_refuses_after_cap(tmp_path):
 def test_call_unknown_runner_is_error(tmp_path):
     ctx, _ = make_ctx(tmp_path, {})
     assert not ctx.call("muse", "p", "cheap", step="s").ok
+
+
+def test_call_refuses_over_token_budget_except_chairman(tmp_path):
+    big = RunResult("x", 400_000, 10, "m")
+    fake = FakeRunner("claude", [big, RunResult("y", 1, 1, "m"), RunResult("z", 1, 1, "m")])
+    ctx, _ = make_ctx(tmp_path, {"claude": fake}, depth="High")
+    assert ctx.call("claude", "p", "cheap", step="scout").ok
+    over = ctx.call("claude", "p", "cheap", step="council")
+    assert not over.ok and "token budget" in over.error
+    assert ctx.call("claude", "p", "top", step="chairman").ok  # the report still gets written

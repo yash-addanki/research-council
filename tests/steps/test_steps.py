@@ -38,7 +38,7 @@ def test_brief_uses_model_json(make_ctx):
 def test_scout_caps_by_depth(make_ctx, monkeypatch):
     ctx = make_ctx({}, depth="High")
     ctx.write_json("brief.json", BRIEF)
-    monkeypatch.setattr(scout, "web_search", lambda ctx, q, limit: [ev(f"{q}{i}") for i in range(50)])
+    monkeypatch.setattr(scout, "web_search", lambda ctx, qs, limit: [ev(f"{q}{i}") for q in qs for i in range(50)])
     monkeypatch.setattr(scout, "SOCIAL_SOURCES", {"hn": lambda q, limit: [ev(f"hn{q}{i}", "hn") for i in range(50)]})
     monkeypatch.setattr(scout, "REPO_SOURCE", lambda q, limit: [])
     lines = scout.run(ctx).read_text().splitlines()
@@ -48,7 +48,7 @@ def test_scout_caps_by_depth(make_ctx, monkeypatch):
 def test_scout_keeps_social_share(make_ctx, monkeypatch):
     ctx = make_ctx({}, depth="Low")
     ctx.write_json("brief.json", BRIEF)
-    monkeypatch.setattr(scout, "web_search", lambda ctx, q, limit: [ev(f"{q}{i}") for i in range(50)])
+    monkeypatch.setattr(scout, "web_search", lambda ctx, qs, limit: [ev(f"{q}{i}") for q in qs for i in range(50)])
     monkeypatch.setattr(scout, "SOCIAL_SOURCES", {"hn": lambda q, limit: [ev(f"hn{i}", "hn") for i in range(50)]})
     monkeypatch.setattr(scout, "REPO_SOURCE", lambda q, limit: [])
     items = [json.loads(l) for l in scout.run(ctx).read_text().splitlines()]
@@ -61,10 +61,33 @@ def test_scout_survives_source_failure(make_ctx, monkeypatch):
 
     def boom(q, limit):
         raise RuntimeError("down")
-    monkeypatch.setattr(scout, "web_search", lambda ctx, q, limit: [ev(q)])
+    monkeypatch.setattr(scout, "web_search", lambda ctx, qs, limit: [ev(q) for q in qs])
     monkeypatch.setattr(scout, "SOCIAL_SOURCES", {"reddit": boom})
     monkeypatch.setattr(scout, "REPO_SOURCE", boom)
     assert len(scout.run(ctx).read_text().splitlines()) == 2
+
+
+def test_scout_makes_one_web_call_for_all_angles_and_skips_gemini(make_ctx, monkeypatch):
+    rows = [{"url": f"https://s{i}", "title": "t", "excerpt": "e"} for i in range(4)]
+    codex, gemini = FakeRunner("codex", [ok(rows)]), FakeRunner("gemini", [])
+    ctx = make_ctx({"codex": codex, "gemini": gemini})
+    ctx.write_json("brief.json", BRIEF)
+    monkeypatch.setattr(scout, "SOCIAL_SOURCES", {})
+    monkeypatch.setattr(scout, "REPO_SOURCE", lambda q, limit: [])
+    items = [json.loads(l) for l in scout.run(ctx).read_text().splitlines()]
+    assert len(codex.calls) == 1 and gemini.calls == [] and len(items) == 4
+    assert "a1" in codex.calls[0][0] and "a2" in codex.calls[0][0]
+
+
+def test_scout_swaps_short_excerpt_for_real_page_passage(make_ctx, monkeypatch):
+    ctx = make_ctx({})
+    ctx.write_json("brief.json", BRIEF)
+    monkeypatch.setattr(scout, "web_search", lambda ctx, qs, limit: [ev("x")])
+    monkeypatch.setattr(scout, "SOCIAL_SOURCES", {})
+    monkeypatch.setattr(scout, "REPO_SOURCE", lambda q, limit: [])
+    monkeypatch.setattr(scout, "fetch_text", lambda url, **k: "menu " * 300 + "the best local LLM for coding is X " * 5)
+    item = json.loads(scout.run(ctx).read_text().splitlines()[0])
+    assert "best local LLM for coding" in item["excerpt"]
 
 
 # --- council
@@ -219,3 +242,10 @@ def test_council_survives_deep_collect_crash(make_ctx, monkeypatch):
     monkeypatch.setattr(council.chrome_deep, "collect", lambda c: 1 / 0)
     council.run(ctx)
     assert "deep_research" in ctx.read_json("missing.json")
+
+
+def test_ensure_unverified_skips_paraphrased_claims():
+    report = "## Answer\nx\n\n## Unverified\n\n- The README says llm-council is 99% vibe coded and unsupported.\n"
+    out = chairman.ensure_unverified(report, ["llm-council README says it is 99% vibe coded and unsupported by the author",
+                                              "Mistral Large 3 costs $0.50 per million input tokens"])
+    assert "vibe coded and unsupported by the author" not in out and "Mistral Large 3" in out
