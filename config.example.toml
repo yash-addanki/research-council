@@ -1,0 +1,33 @@
+notion_data_source_id = "584e4526-ff39-4614-96d7-f1c0e2b051dd"
+allowlist = ["astral-sh/uv", "cli/cli", "openai/codex", "Panniantong/Agent-Reach", "mvanhorn/last30days-skill", "unclecode/crawl4ai", "multica-ai/andrej-karpathy-skills", "vercel-labs/skills", "supabase/agent-skills"]
+
+[paths]
+runs_dir = "~/GitRepos/research-council/runs"
+gitrepos = "~/GitRepos"
+db = "~/GitRepos/research-council/state.db"
+
+# Model names per tier; confirmed in docs/cli-notes.md
+[tiers.claude]
+cheap = "haiku"
+mid = "sonnet"
+top = "opus"
+
+[tiers.codex]
+cheap = "gpt-6-luna"
+mid = "gpt-6.1-sol"
+top = "gpt-6-astra"
+
+[tiers.gemini]
+# run through the Antigravity CLI (agy); names from `agy models`
+cheap = "gemini-3.8-flash-low"
+mid = "gemini-3.8-flash-medium"
+top = "gemini-3.8-flash-high"
+
+[caps]
+evidence_low = 30
+evidence_medium = 45
+evidence_high = 60
+calls_per_model_per_run = 12
+
+# rolling 5-hour cap the scheduler respects per model
+calls_per_model_per_window = 60
