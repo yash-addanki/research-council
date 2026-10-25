@@ -1,0 +1,23 @@
+{
+  "name": "bob-research",
+  "version": "0.1.0",
+  "description": "Research Council in Claude Code: /bob_research commands, a per-topic dashboard pane with token usage, status line and alerts",
+  "author": {
+    "name": "Yash"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "repo": {
+      "type": "string",
+      "title": "research-council folder",
+      "description": "Where the research-council repo lives on this computer",
+      "default": "~/GitRepos/research-council"
+    },
+    "refreshSeconds": {
+      "type": "number",
+      "title": "Dashboard refresh (seconds)",
+      "description": "How often the dashboard re-reads the runs",
+      "default": 20
+    }
+  }
+}

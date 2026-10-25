@@ -83,6 +83,12 @@ def cmd_status(cfg: Config) -> int:
     return 0
 
 
+def cmd_dashboard(cfg: Config) -> int:
+    from research_council.dashboard import snapshot
+    print(json.dumps(snapshot(cfg.paths.runs_dir, cfg.paths.db)))
+    return 0
+
+
 def _notifier():
     """WhatsApp notifier when its Keychain entries exist, else None."""
     try:
@@ -121,6 +127,7 @@ def main(argv: list[str] | None = None) -> int:
     p_resume.add_argument("run_id")
     p_resume.add_argument("--dry-run", action="store_true")
     sub.add_parser("status", help="list recent runs")
+    sub.add_parser("dashboard", help="print every run's stages, tokens and quota as JSON")
     sub.add_parser("setup", help="install the allowlisted research tools")
     p_inst = sub.add_parser("install", help="install a new tool; asks on WhatsApp unless allowlisted")
     p_inst.add_argument("name")
@@ -132,6 +139,8 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_config(args.config)
     if args.cmd == "status":
         return cmd_status(cfg)
+    if args.cmd == "dashboard":
+        return cmd_dashboard(cfg)
     if args.cmd in ("setup", "install"):
         return cmd_tools(args, cfg)
     notion = NotionClient(get_secret("notion_token"), cfg.notion_data_source_id)

@@ -65,6 +65,10 @@ class State:
             (topic_id, version),
         )
 
+    def lease_active(self, topic_id: str, now: float) -> bool:
+        rows = self._exec("SELECT lease_until FROM leases WHERE topic_id = ?", (topic_id,))
+        return bool(rows and rows[0][0] > now)
+
     def record_usage(self, run_id, step, model, tokens_in, tokens_out, now: float) -> None:
         self._exec(
             "INSERT INTO usage (run_id, step, model, tokens_in, tokens_out, at) VALUES (?, ?, ?, ?, ?, ?)",

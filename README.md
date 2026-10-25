@@ -13,12 +13,35 @@ uv run research next --ask-first  # what the 2-hourly schedule runs: idle + quot
 uv run research run <notion-url>  # one specific topic
 uv run research resume <run-id>   # continue a stopped run from its last finished step
 uv run research status            # recent runs
+uv run research dashboard         # every run's stages, tokens and quota as JSON (feeds the Claude Code mod)
 uv run research setup             # install the allowlisted tools
 uv run research install <name> <owner/repo> --check "<cmd>" -- <install cmd...>
                                   # a new tool: asks on WhatsApp unless the repo is allowlisted
 ```
 
 Each run writes its steps to `runs/<date>-<slug>/` (`brief.json`, `evidence.jsonl`, `answer.*.json`, `deep.*.md`, `citations.json`, `review.json`, `report.md`, `final_report.md` with the token table), and the final report goes into the Notion page.
+
+## Claude Code mod: bob-research
+
+`plugins/bob-research` adds the council to Claude Code: a **Research Council** dashboard pane (every topic, its stage, evidence and citation counts, council answers, and tokens by model and by step, plus quota), a status line entry, and a toast/notification when a run finishes or gets blocked. It refreshes every 20 s.
+
+Install once, at a Claude Code prompt on the Mac (answer `y` to add the marketplace, then pick the user scope):
+
+```
+/plugin install bob-research --marketplace yash-addanki/research-council
+```
+
+Then:
+
+```
+/bob_research                         # open the dashboard
+/bob_research status                  # list runs in the chat
+/bob_research next [--dry-run]        # research the top topic (runs in the background)
+/bob_research run <notion-url> [--dry-run]
+/bob_research resume <run-id> [--dry-run]
+```
+
+Background runs log to `.bob-research.log` in this folder. If the repo is not at `~/GitRepos/research-council`, change the folder in `/config` under bob-research. Mod tests: `claude plugin test plugins/bob-research`.
 
 ## One-time setup (Yash)
 
