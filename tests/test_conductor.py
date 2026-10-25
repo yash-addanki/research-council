@@ -139,3 +139,19 @@ def test_heartbeat_keeps_lease_alive_during_long_step(tmp_path, monkeypatch):
 def test_deep_submit_uses_chrome_step():
     from research_council.runners import chrome_deep
     assert conductor.DEFAULT_STEPS["deep_submit"] is chrome_deep.submit
+
+
+def test_block_writes_blocked_file_and_resume_clears_it(tmp_path):
+    calls = []
+
+    def broken(ctx):
+        raise RuntimeError("network down")
+    ctx, _, _, pipe = make(tmp_path, all_steps(calls, scout=broken))
+    with pytest.raises(conductor.Blocked):
+        pipe.run()
+    assert json.loads(ctx.path("blocked.json").read_text())["step"] == "scout"
+    (tmp_path / "again").mkdir()
+    ctx2, _, _, pipe2 = make(tmp_path / "again", all_steps(calls))
+    ctx2.write_json("blocked.json", {"step": "scout"})
+    pipe2.run()
+    assert not ctx2.path("blocked.json").exists()

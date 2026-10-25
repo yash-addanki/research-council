@@ -69,6 +69,7 @@ class Pipeline:
     def _block(self, step: str, reason: str):
         msg = f"Blocked at {step}: {reason}"
         log.error(msg)
+        self.ctx.write_json("blocked.json", {"step": step, "reason": reason, "at": self.ctx.clock()})
         if not self.ctx.dry_run:
             notes = f"{self.ctx.topic.notes}\n{msg}".strip()
             self.notion.set_props(self.ctx.topic.page_id, notes=notes)
@@ -83,6 +84,7 @@ class Pipeline:
 
     def run(self) -> Path:
         ctx = self.ctx
+        ctx.path("blocked.json").unlink(missing_ok=True)  # a resume starts unblocked
         for name in STEPS:
             if not ctx.state.heartbeat(ctx.topic.page_id, self.lease_version, ctx.clock()):
                 raise LeaseLost(f"lease on {ctx.topic.page_id} was taken by another run")
