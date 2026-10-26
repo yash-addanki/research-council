@@ -36,15 +36,20 @@ def _covered(claim: str, report_words: set[str]) -> bool:
 
 def ensure_unverified(report: str, claims: list[str]) -> str:
     report_words = set(re.findall(r"[a-z0-9$.%]+", report.lower()))
-    absent = [c for c in claims if not _covered(c, report_words)]
+    absent = {}
+    for c in claims:
+        if not _covered(c, report_words):
+            absent.setdefault(" ".join(c.lower().split()).rstrip("."), " ".join(c.split()))  # members repeat claims
     if not absent:
         return report
-    bullets = "".join(f"- {c}\n" for c in absent)
+    bullets = "".join(f"- {c}\n" for c in absent.values())
     marker = "## Unverified"
     if marker not in report:
         return report.rstrip() + f"\n\n{marker}\n\n{bullets}"
     head, tail = report.split(marker, 1)
-    return f"{head}{marker}\n\n{bullets}{tail.lstrip(chr(10))}"
+    section, sep, rest = tail.partition("\n## ")  # add after the chairman's own list, before the next section
+    listed = section.strip() + "\n" if section.strip() else ""
+    return f"{head}{marker}\n\n{listed}{bullets}" + (f"\n## {rest}" if sep else "")
 
 
 def run(ctx: RunContext) -> Path:

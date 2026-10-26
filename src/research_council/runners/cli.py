@@ -37,4 +37,6 @@ class CliRunner:
             return RunResult("", 0, 0, model, error=f"{self.name}: timed out after {timeout_s}s")
         except FileNotFoundError:
             return RunResult("", 0, 0, model, error=f"{self.name}: CLI not installed")
-        return self.parse(proc.stdout, proc.stderr, proc.returncode)
+        res = self.parse(proc.stdout, proc.stderr, proc.returncode)
+        res.model = res.model or model  # agy's JSON doesn't name the model
+        return res

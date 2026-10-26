@@ -58,7 +58,9 @@ def _rt(text: str) -> list[dict]:
         if m.start() > pos:
             spans.append((text[pos:m.start()], {}, None))
         if m.group(1) is not None:
-            spans.append((m.group(1), {"bold": True}, None))
+            for i, piece in enumerate(m.group(1).split("`")):  # `code` inside **bold**
+                if piece:
+                    spans.append((piece, {"bold": True, "code": True} if i % 2 else {"bold": True}, None))
         elif m.group(2) is not None:
             spans.append((m.group(2), {"code": True}, None))
         else:

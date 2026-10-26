@@ -154,6 +154,14 @@ def test_inline_bold_code_and_links_are_annotated():
     assert bold["annotations"]["bold"] and code["annotations"]["code"] and link["text"]["link"]["url"] == "https://x.dev"
 
 
+def test_code_inside_bold_keeps_both_annotations():
+    [p] = markdown_to_blocks("**Run `uv sync` first** then go")
+    rich = p["paragraph"]["rich_text"]
+    assert _text(rich) == "Run uv sync first then go"
+    code = next(r for r in rich if r["text"]["content"] == "uv sync")
+    assert code["annotations"] == {"bold": True, "code": True}
+
+
 def test_numbered_list_and_heading_inside_paragraph_block():
     blocks = markdown_to_blocks("**Next steps**\n1. pilot\n2. score")
     assert [b["type"] for b in blocks] == ["paragraph", "numbered_list_item", "numbered_list_item"]
