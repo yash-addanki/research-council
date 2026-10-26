@@ -172,3 +172,8 @@ def test_run_strips_null_bytes_from_prompt(runner, monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake)
     runner.run("evidence \x00 from a pdf\x01", "cheap", timeout_s=1)
     assert not any("\x00" in a or "\x01" in a for a in seen["argv"])
+
+
+def test_gemini_result_names_the_tier_model(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", lambda argv, **kw: subprocess.CompletedProcess(argv, 0, fx("agy.ok.json"), ""))
+    assert GeminiRunner(TIERS).run("hi", "top").model == "t-model"  # agy's JSON doesn't say which model ran

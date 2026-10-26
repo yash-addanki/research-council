@@ -252,6 +252,15 @@ def test_ensure_unverified_skips_paraphrased_claims():
     assert "vibe coded and unsupported by the author" not in out and "Mistral Large 3" in out
 
 
+def test_ensure_unverified_adds_missed_claims_after_the_curated_list_once():
+    report = "## Answer\nx\n\n## Unverified\n\n- curated item\n\n## Sources\n1. a\n"
+    out = chairman.ensure_unverified(report, ["Mistral Large 3 costs $0.50 per million input tokens",
+                                              "Mistral  Large 3 costs $0.50 per million input tokens."])
+    unverified = out.split("## Unverified", 1)[1].split("## Sources", 1)[0]
+    assert unverified.index("curated item") < unverified.index("Mistral")
+    assert out.count("Mistral") == 1 and out.rstrip().endswith("1. a")
+
+
 # --- run history as evidence
 def _past_run(runs_dir, name, ctx):
     d = runs_dir / name
