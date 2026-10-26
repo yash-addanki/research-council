@@ -1,6 +1,7 @@
 """Per-run context shared by every step, including the single gate for model calls."""
 
 import json
+import logging
 import threading
 import time
 from dataclasses import dataclass, field
@@ -13,8 +14,12 @@ from research_council.tokens import total_tokens
 from research_council.runners.base import RunResult, Runner
 from research_council.state import State
 
+log = logging.getLogger(__name__)
 COOLDOWN_S = 3 * 3600
 CHAIRMAN_SHARE = 0.12  # budget kept back for the final write-up, which always runs
+# share of the budget a step must leave for the steps after it: citations stop early so review still runs
+HOLD_BACK = {"citations": 0.35, "review": CHAIRMAN_SHARE}
+BUDGET_SKIPS = "budget_skips.jsonl"
 OUT_RESERVE = 4000  # expected reply tokens, reserved with the prompt until the call reports real usage
 
 
@@ -54,8 +59,8 @@ class RunContext:
             reserve = len(prompt) // 4 + OUT_RESERVE
             with self._lock:
                 spent = total_tokens(self.state.usage_for_run(self.run_id))
-                if spent + self._reserved + reserve > budget * (1 - CHAIRMAN_SHARE):
-                    return RunResult("", 0, 0, runner_name, error=f"token budget {budget:,} for {self.depth} reached")
+                if spent + self._reserved + reserve > budget * (1 - HOLD_BACK.get(step, CHAIRMAN_SHARE)):
+                    return self._skip(step, runner_name, f"token budget {budget:,} for {self.depth} reached")
                 self._reserved += reserve
         self._calls[runner_name] = self._calls.get(runner_name, 0) + 1
         try:
@@ -67,6 +72,13 @@ class RunContext:
         if res.rate_limited:
             self.state.set_cooldown(runner_name, now + COOLDOWN_S)
         return res
+
+    def _skip(self, step: str, runner_name: str, error: str) -> RunResult:
+        """A budget refusal is recorded for the report, so a step that quietly did less is visible."""
+        log.warning("%s/%s skipped: %s", step, runner_name, error)
+        with self.path(BUDGET_SKIPS).open("a") as f:
+            f.write(json.dumps({"step": step, "model": runner_name, "reason": error}) + "\n")
+        return RunResult("", 0, 0, runner_name, error=error)
 
     def available(self, names: list[str]) -> list[str]:
         now = self.clock()

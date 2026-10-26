@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -118,3 +119,13 @@ def test_budget_keeps_room_for_chairman(tmp_path):
     assert ctx.call("claude", "p", "cheap", step="scout").ok
     over = ctx.call("claude", "p", "cheap", step="review")  # 140k spent is past 88% of 150k
     assert not over.ok and "token budget" in over.error
+
+
+def test_citations_leave_budget_for_review_and_skips_are_recorded(tmp_path):
+    fake = FakeRunner("gemini", [RunResult("x", 95_000, 0, "m"), RunResult("z", 1, 1, "m")])
+    ctx, _ = make_ctx(tmp_path, {"gemini": fake}, depth="Low")  # 150k: citations stop at 65%, review at 88%
+    assert ctx.call("gemini", "p", "cheap", step="council").ok
+    assert not ctx.call("gemini", "p", "cheap", step="citations").ok  # 95k + reserve is past 97.5k
+    assert ctx.call("gemini", "p", "mid", step="review").ok  # review still fits under 132k
+    skips = [json.loads(l) for l in ctx.path("budget_skips.jsonl").read_text().splitlines()]
+    assert skips == [{"step": "citations", "model": "gemini", "reason": "token budget 150,000 for Low reached"}]

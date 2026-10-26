@@ -295,3 +295,12 @@ def test_citations_check_run_history_claims_against_the_summary(make_ctx, monkey
     monkeypatch.setattr(citations, "fetch_text", lambda url, **k: pytest.fail("runs:// is not fetched"))
     data = json.loads(citations.run(ctx).read_text())
     assert data[0]["label"] == "supported" and "95000" in fake.calls[0][0]
+
+
+def test_citations_verbatim_claim_is_supported_without_model(make_ctx, monkeypatch):
+    fake = FakeRunner("gemini", [])
+    ctx = make_ctx({"gemini": fake})
+    ctx.write_json("answer.claude.json", answer([{"id": "c1", "claim": "Beam merges  answers", "source_urls": ["https://a"], "confidence": 0.9}]))
+    monkeypatch.setattr(citations, "fetch_text", lambda url, **k: "menu " * 2000 + "big-AGI Beam merges answers from many models")
+    data = json.loads(citations.run(ctx).read_text())
+    assert data[0]["label"] == "supported" and fake.calls == []

@@ -110,6 +110,7 @@ def test_report_step_writes_report_tokens_and_resolves(tmp_path):
     assert "Use X" in appended and "## Tokens used" in appended and "| claude |" in appended
     props = next(c for c in notion.calls if c[0] == "props")[2]
     assert props["tokens_used"] == 120 and props["run_id"] == "r1"
+    assert props["report_url"] == "https://www.notion.so/p1"
     assert ("status", "p1", "Resolved") in notion.calls
     assert "120 tokens" in notifier.sent[-1] and "Use X" in notifier.sent[-1]
 
@@ -155,3 +156,14 @@ def test_block_writes_blocked_file_and_resume_clears_it(tmp_path):
     ctx2.write_json("blocked.json", {"step": "scout"})
     pipe2.run()
     assert not ctx2.path("blocked.json").exists()
+
+
+def test_report_lists_calls_skipped_for_budget(tmp_path):
+    calls = []
+    ctx, notion, _, pipe = make(tmp_path, all_steps(calls, report=conductor.report_step))
+    ctx.path("report.md").write_text("## Answer\nUse X\n")
+    ctx.path("budget_skips.jsonl").write_text(
+        '{"step": "review", "model": "codex", "reason": "r"}\n{"step": "review", "model": "codex", "reason": "r"}\n')
+    pipe.run()
+    appended = next(c for c in notion.calls if c[0] == "append")[2]
+    assert "## Skipped for token budget" in appended and "- review (codex): 2 call(s)" in appended
