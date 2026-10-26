@@ -8,7 +8,7 @@ from typing import Callable
 
 from research_council.runners import chrome_deep
 from research_council.steps import act, brief, chairman, citations, council, review, scout
-from research_council.steps.context import RunContext
+from research_council.steps.context import BUDGET_SKIPS, RunContext
 from research_council.tokens import token_table, total_tokens
 
 log = logging.getLogger(__name__)
@@ -36,6 +36,13 @@ def report_step(ctx: RunContext) -> Path:
     apps = sorted(p.name[len("deep."):-len(".md")] for p in ctx.run_dir.glob("deep.*.md"))
     report = ctx.path("report.md").read_text()
     full = f"{report.rstrip()}\n\n## Tokens used\n\n{token_table(rows, apps)}\n"
+    skips = ctx.path(BUDGET_SKIPS)
+    if skips.exists():
+        counts: dict[str, int] = {}
+        for line in skips.read_text().splitlines():
+            s = json.loads(line)
+            counts[f"{s['step']} ({s['model']})"] = counts.get(f"{s['step']} ({s['model']})", 0) + 1
+        full += "\n## Skipped for token budget\n\n" + "".join(f"- {k}: {n} call(s)\n" for k, n in counts.items())
     ctx.path("final_report.md").write_text(full)
     total = total_tokens(rows)
     answer = report.split("## Answer", 1)[-1].strip().split("\n\n")[0].replace("\n", " ")[:300]
@@ -45,7 +52,8 @@ def report_step(ctx: RunContext) -> Path:
         print(summary)
     else:
         ctx.notion.replace_report(ctx.topic.page_id, full)
-        ctx.notion.set_props(ctx.topic.page_id, run_id=ctx.run_id, tokens_used=total)
+        ctx.notion.set_props(ctx.topic.page_id, run_id=ctx.run_id, tokens_used=total,
+                             report_url=f"https://www.notion.so/{ctx.topic.page_id.replace('-', '')}")
         ctx.notion.set_status(ctx.topic.page_id, "Resolved")
         if ctx.notifier:
             ctx.notifier.notify(summary)

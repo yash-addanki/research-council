@@ -15,6 +15,10 @@ PAGE_CHARS = 3000
 MAX_PAIRS = 60
 
 
+def _norm(text: str) -> str:
+    return " ".join(text.lower().split())
+
+
 def run(ctx: RunContext) -> Path:
     pairs = []
     for member, ans in load_answers(ctx).items():
@@ -29,6 +33,9 @@ def run(ctx: RunContext) -> Path:
     for p in pairs:
         # a past-run summary has no web page; check the claim against the summary the council read
         page = local.get(p["url"]) if p["url"].startswith(PREFIX) else fetch_text(page_url(p["url"]), max_chars=60000)
+        if page is not None and _norm(p["claim"]) in _norm(page):  # quoted word for word: no model needed
+            results.append({"member": p["member"], "id": p["id"], "url": p["url"], "label": "supported"})
+            continue
         if page is not None:
             page = best_passage(page, p["claim"], PAGE_CHARS)  # the part of the page about this claim
         if page is None:
